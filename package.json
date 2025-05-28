@@ -1,9 +1,12 @@
 {
-  "name": "vue3-excel-editor-v5",
-  "email": "bourisettyvaralaramadevi@gmail.com",
+  "name": "vue3-excel-editor-custom-built",
+  "email": "ramadevi.bourisettyvaralaramadevi@factset.com",
   "description": "Vue3 plugin for displaying and editing the array-of-object in Excel style",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "src/main.js",
+  "publishConfig": {
+    "registry": "https://artifactory.factset.com/artifactory/api/npm/cc-npm/"
+  },
   "dependencies": {
     "@vuepic/vue-datepicker": "^3.3.0",
     "vuedraggable": "^4.1.0",
@@ -11,44 +14,20 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Ramadevi2004/vue3-excel-editor-v5.git"
+    "url": "git+https://github.factset.com/fds44666/vue3-excel-editor-custom-built.git"
   },
   "keywords": [
-    "vue",
-    "vue3",
-    "vuejs",
-    "excel",
-    "data",
-    "grid",
-    "table",
-    "v-model",
-    "editor",
-    "editable",
-    "javascript",
-    "DHTML",
-    "no-jquery",
-    "grid-editor",
-    "online-editor",
-    "data-grid",
-    "data-table",
-    "spreadsheet",
-    "tabular-data",
-    "edit-cell",
-    "editable-table",
-    "data-spreadsheet",
-    "bootstrap",
-    "responsive",
-    "navigatable",
-    "contenteditable"
+    "vue", "vue3", "vuejs", "excel", "data", "grid", "table",
+    "v-model", "editor", "editable", "javascript", "DHTML",
+    "no-jquery", "grid-editor", "online-editor", "data-grid",
+    "data-table", "spreadsheet", "tabular-data", "edit-cell",
+    "editable-table", "data-spreadsheet", "bootstrap", "responsive",
+    "navigatable", "contenteditable"
   ],
   "author": "Ramadevi Bourisetty Varala",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/Ramadevi2004/vue3-excel-editor-v5/issues"
+    "url": "https://github.factset.com/fds44666/vue3-excel-editor-custom-built/issues"
   },
-  "homepage": "https://github.com/Ramadevi2004/vue3-excel-editor-v5"
-<<<<<<< HEAD
+  "homepage": "https://github.factset.com/fds44666/vue3-excel-editor-custom-built"
 }
-=======
-}
->>>>>>> 5c1a6a095719766a6222ca1595b20907eda4f7c7

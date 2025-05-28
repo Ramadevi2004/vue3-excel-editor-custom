@@ -1,3 +1,4 @@
+
 <template>
   <div ref="editor" class="vue-excel-editor" :style="{display: 'inline-block', width}">
     <div class="component-content">
@@ -45,6 +46,7 @@
                   :class="{'sort-asc-sign': sortPos==p && sortDir==1,
                           'sort-des-sign': sortPos==p && sortDir==-1,
                           'sticky-column': item.sticky,
+                          // 'sticky-sign' :item.sticky,
                           'no-sorting': item.noSorting}"
                   :style="{left: item.left}"
                   @mousedown="headerClick($event, p)"
@@ -52,6 +54,9 @@
                 <div :class="{'filter-sign': columnFilter[p]}">
                   <span :class="{'table-col-header': !noHeaderEdit}" v-html="headerLabel(item.label, item)"></span>
                 </div>
+                <!-- Sticky Column Symbol -->
+                <div v-if="item.sticky" class="sticky-sign"></div>
+
                 <div class="col-sep"
                     @mousedown="colSepMouseDown"
                     @mouseover="colSepMouseOver"
@@ -61,7 +66,8 @@
               </th>
             </tr>
             <tr :class="{hide: !filterRow}">
-              <td class="center-text first-col tl-filter"
+              <td 
+                  class="center-text first-col tl-filter"
                   :class="{hide: noNumCol}"
                   style="vertical-align: middle; padding: 0"
                   :style="{top: calCellTop2 + 'px'}"
@@ -122,7 +128,7 @@
                   }"
                   :key="p"
                   :style="Object.assign(cellStyle(record, item), renderColumnCellStyle(item, record))"
-                  @mouseover="cellMouseOver"
+                  @mouseover="cellMouseOver(item.label,$event)"
                   @mousemove="cellMouseMove">
                   <template v-if="item.format=='html'"><span v-html="item.toText(record[item.name], record, item, p)" /></template>
                   <template v-else>{{ item.toText(record[item.name], record, item, p) }}</template>
@@ -154,7 +160,7 @@
         <div v-show="tip" ref="tooltip" class="tool-tip">{{ tip }}</div>
 
         <!-- Text Tip -->
-        <div v-show="textTip" ref="texttip" class="text-tip">{{ textTip }}</div>
+        <div v-show="textTip" ref="texttip" class="text-tip" v-html="textTip"></div>
 
         <!-- Editor Square -->
         <div v-show="focused" ref="inputSquare" class="input-square" @mousedown="inputSquareClick">
@@ -213,13 +219,13 @@
       <!-- Autocomplete List -->
       <!-- Autocomplete List -->
 
-    <div @click="clickOutside">
+    <div >
     <!-- Assuming you have a cell or element to display the selected items -->
     <!-- <div class="selected-items-display">
       {{ selectedItemsForAutocomplete.join(', ') }}
     </div> -->
 
-    <ul ref="autocomplete" v-show="focused && autocompleteInputs.length" class="autocomplete-results" @mousedown.prevent.stop>
+    <ul ref="autocomplete" v-show="focused && autocompleteInputs.length" class="autocomplete-results" @mousedown.prevent.stop @keydown.exact.esc="hideMultiSelectDropdown">
       <template v-if="currentField && currentField.type === 'multiselect'">
       <li v-for="(item, i) in autocompleteInputs" :key="i">
         <label class="autocomplete-result-label">
@@ -356,6 +362,7 @@ import DatePicker from '@vuepic/vue-datepicker'
 import {read, writeFile, utils} from 'xlsx'
 
 import '@vuepic/vue-datepicker/dist/main.css'
+import { isThisSecond } from 'date-fns'
 
 export default defineComponent({
   components: {
@@ -462,7 +469,9 @@ export default defineComponent({
           noMatchedColumnName: 'No matched column name',
           invalidInputValue: 'Invalid input value',
           missingKeyColumn: 'Missing key column',
-          noRecordIndicator: 'No record'
+          noRecordIndicator: 'No record',
+          freezeColumn: 'Freeze Column',
+          unFreezeColumn: 'UnFreeze Column'
         }
       }
     },
@@ -1043,7 +1052,10 @@ export default defineComponent({
     //   }
     //   this.calSummary()
     // },
-
+    hideMultiSelectDropdown(){
+      this.focused = false;
+      this.selectedItemsForAutocomplete = []
+    },
     calTable() {
       this.textTip = ''
       // add unique key to each row if no key is provided
@@ -1568,6 +1580,7 @@ export default defineComponent({
     /* *** Window Event *******************************************************************************************
      */
     tableScroll () {
+      // console.log("table scroll")
       this.showDatePicker = false
       this.autocompleteInputs = []
       if (this.focused && this.currentField)
@@ -2007,13 +2020,39 @@ export default defineComponent({
       const index = Array.from(th.parentElement.children).findIndex(v => v === th)
       this.fields[index - 1].label = e.target.textContent
     },
+    isSticky(pos){
+      const colPos = typeof pos === 'undefined' ? this.columnFilterRef.colPos : pos
+      const field = this.fields[colPos]
+      // field.sticky = true;
+      // this.localizedLabel.freezeColumn = "Unfreeze Column"
+      // this.refresh()
+      // this.processing = false
+      if(field.sticky){
+        return true
+      }
+      else {
+        return false
+      }
+    },
+    freezeOrUnFreezeColumn(pos){
+      const colPos = typeof pos === 'undefined' ? this.columnFilterRef.colPos : pos
+      const field = this.fields[colPos]
+      let beforeField = null
+      // console.log(typeof(field))
+      // console.log(this.fields.length);
+      for(let i=0;i<=colPos;i++){
+          beforeField = this.fields[i];
+          beforeField.sticky = (field.sticky)?false:true;
+      }
+      
+      this.refresh()
+      this.processing = false
+    },
     sort (n, pos) {
       const colPos = typeof pos === 'undefined' ? this.columnFilterRef.colPos : pos
       const field = this.fields[colPos]
       if (field.noSorting) return
-
       this.processing = true
-
       const name = field.name
       setTimeout(() => {
         let sorting = field.sorting
@@ -2186,11 +2225,13 @@ export default defineComponent({
     settingClick() {
       if (!this.disablePanelSetting)
         this.$refs.panelSetting.showPanel();
+      // console.log("hello");
     },
 
     panelFilterClick(item) {
       if (!this.disablePanelFilter)
         this.$refs.panelFilter.showPanel(this.$refs[`filter-${item.name}`][0]);
+      // console.log("panelFilterClick")
     },
 
     /* *** Import/Export ************************************************************************************
@@ -2444,6 +2485,7 @@ export default defineComponent({
       this.prevSelect = rowPos
     },
     selectAllClick () {
+      // console.log("selected count");
       this.toggleSelectAllRecords()
     },
     reviseSelectedAfterTableChange () {
@@ -2495,6 +2537,7 @@ export default defineComponent({
     },
     toggleSelectAllRecords (e) {
       if (e) e.preventDefault()
+      // console.log(this.selectedCount);
       if (this.selectedCount > 0)
         this.clearAllSelected()
       else {
@@ -2508,6 +2551,7 @@ export default defineComponent({
       //  this.unSelectRecord(this.pageTop + i)
       if (this.selectedCount > 0)
         this.$emit('select', Object.keys(this.selected).map(rowPos => Number(rowPos)), false)
+      // console.log("selected count",this.selectedCount);
       this.selected = {}
       this.selectedCount = 0
     },
@@ -2593,6 +2637,7 @@ export default defineComponent({
     moveSouth () {
       if (this.focused) {
         // if (this.currentRowPos + 1 >= this.table.length) {
+        // console.log("south")
         if (this.currentRowPos+1 >= (this.pageBottom - this.pageTop) && this.pageBottom >= this.table.length) {
           if (this.readonly) return false
           if (!this.newIfBottom) return false
@@ -2691,15 +2736,32 @@ export default defineComponent({
         cursor = 'pointer'
       e.target.style.cursor = cursor
     },
-    cellMouseOver (e) {
-      const cell = e.target
-      if (!cell.classList.contains('error')) return
-      if (this.tipTimeout) clearTimeout(this.tipTimeout)
-      if ((this.tip = this.errmsg[cell.getAttribute('id')]) === '') return
-      const rect = cell.getBoundingClientRect()
-      this.$refs.tooltip.style.top = (rect.top - 14) + 'px'
-      this.$refs.tooltip.style.left = (rect.right + 8) + 'px'
-      cell.addEventListener('mouseout', this.cellMouseOut)
+    // cellMouseOver (e) {
+    //   // console.log("cellMouseOver")
+    //   const cell = e.target
+    //   console.log(cell.textContent);
+    //   if (!cell.classList.contains('error')) return
+    //   if (this.tipTimeout) clearTimeout(this.tipTimeout)
+    //   if ((this.tip = this.errmsg[cell.getAttribute('id')]) === '') return
+    //   const rect = cell.getBoundingClientRect()
+    //   this.$refs.tooltip.style.top = (rect.top - 14) + 'px'
+    //   this.$refs.tooltip.style.left = (rect.right + 8) + 'px'
+    //   cell.addEventListener('mouseout', this.cellMouseOut)
+    // },
+    cellMouseOver(fieldName, e) {
+      // console.log(fieldName);
+      const cell = e.target;
+      let cellText = cell.innerHTML;
+      if (fieldName === "Data Dictionary Product Name") {
+        cellText = cellText.split(",").map(item => item.trim()).join("<br>"); // Splitting by comma and adding line breaks
+      }
+      this.textTip = cellText; // Store formatted text in tooltip
+      const rect = cell.getBoundingClientRect();
+      this.$refs.texttip.style.top = (rect.top - 14) + "px";
+      this.$refs.texttip.style.left = (rect.right + 8) + "px";
+      if(cellText)
+      this.$refs.texttip.style.display = "block"; // Ensure tooltip is visible
+      cell.addEventListener("mouseout", this.cellMouseOut);
     },
     numcolMouseOver (e) {
       const cell = e.target
@@ -2819,6 +2881,7 @@ export default defineComponent({
       return true
     },
     inputSquareClick () {
+      // console.log("input square clicked")
       if (!this.currentField.readonly && !this.inputBoxShow && this.currentField.type !== 'select') {
         this.inputBox.value = this.currentCell.textContent
         this.inputBoxShow = 1
@@ -3188,8 +3251,12 @@ export default defineComponent({
           let list = []
 
           if (field.options) {
+            // console.log("ends with funciton");
+            // console.log(field.options);
             if (field.options.constructor.name.endsWith('Function')) {
+              console.log("ends with funciton");
               list = await field.options(value, this.currentRecord)
+              console.log("list",list);
               if (field.type === 'map') list = Object.values(list)
               else list = list.slice()
               if (this.inputBoxShow)
@@ -3203,12 +3270,25 @@ export default defineComponent({
                   .filter(v => v)
                   .map(v => v.toUpperCase())
 
-                list = list.filter(element => !selectedValues.includes(element.toUpperCase()))
+                // list = list.filter(element => !selectedValues.includes(element.toUpperCase()))
+                // list.sort((a, b) => {
+                //   const isASelected = this.selectedItemsForAutocomplete.includes(a);
+                //   const isBSelected = this.selectedItemsForAutocomplete.includes(b);
+
+                //   if (isASelected && !isBSelected) return -1; // Selected items first
+                //   if (!isASelected && isBSelected) return 1;  // Unselected items later
+                //   return a.localeCompare(b); // Alphabetical sorting for unselected items
+                // });
+
+
+
               }
 
               list.sort().splice(listCount)
+              
             }
             else if (Object.values(field.options).length > 0) {
+              // console.log("else if")
               list = field.options
               if (field.type === 'map') list = Object.values(list)
               else list = list.slice()
@@ -3227,14 +3307,22 @@ export default defineComponent({
               // }
 
               if (this.currentField.type === 'multiselect') {
-        const delimiter = this.currentField.delimiter || ',';
-        const selectedValues = (this.inputBox.value || '').split(delimiter).map(v => v.trim());
+                // console.log("list",list);
+                const delimiter = this.currentField.delimiter || ',';
+                const selectedValues = (this.inputBox.value || '').split(delimiter).map(v => v.trim());
+                // console.log(selectedValues);
+                this.selectedItemsForAutocomplete = selectedValues;
+                // console.log("intiasing selectedItemsForAutocomplete")
+                list.sort((a, b) => {
+                  const isASelected = this.selectedItemsForAutocomplete.includes(a);
+                  const isBSelected = this.selectedItemsForAutocomplete.includes(b);
 
-        this.selectedItemsForAutocomplete = selectedValues;
-      }
-
-
-              list.sort().splice(listCount)
+                  if (isASelected && !isBSelected) return -1; // Selected items first
+                  if (!isASelected && isBSelected) return 1;  // Unselected items later
+                  return a.localeCompare(b); // Alphabetical sorting for unselected items
+                });
+              }
+              list.splice(listCount);
             }
           }
           else {
@@ -3254,11 +3342,26 @@ export default defineComponent({
                 .map(v => v.toUpperCase())
 
               list = list.filter(element => !selectedValues.includes(element.toString().toUpperCase()))
+              list.sort((a, b) => {
+                const isASelected = this.selectedItemsForAutocomplete.includes(a);
+                const isBSelected = this.selectedItemsForAutocomplete.includes(b);
+
+                if (isASelected && !isBSelected) return -1; // Selected items first
+                if (!isASelected && isBSelected) return 1;  // Unselected items later
+                return a.localeCompare(b); // Alphabetical sorting for unselected items
+              });
             }
-
             list.sort()
-          }
+            // list.sort((a, b) => {
+            //   const isASelected = selectedValues.includes(a.toUpperCase());
+            //   const isBSelected = selectedValues.includes(b.toUpperCase());
 
+            //   if (isASelected && !isBSelected) return -1;
+            //   if (!isASelected && isBSelected) return 1;
+            //   return a.localeCompare(b);
+            // });
+            // list.sort((a, b) => b.localeCompare(a));
+          }
           this.autocompleteSelect = list.findIndex(element => element?.toString().toUpperCase().startsWith(value))
           this.autocompleteInputs = list
           const rect = this.currentCell.getBoundingClientRect()
@@ -3294,63 +3397,63 @@ export default defineComponent({
 
     inputAutocompleteText(text, e) {
        if (e) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
+        e.preventDefault();
+        e.stopPropagation();
+      }
 
-  // Special handling for multiselect type
-  if (this.currentField && this.currentField.type === 'multiselect') {
-    // Don't close the dropdown for multiselect - this is the key fix!
-    // Instead, toggle the selected item
+      // Special handling for multiselect type
+      if (this.currentField && this.currentField.type === 'multiselect') {
+        // Don't close the dropdown for multiselect - this is the key fix!
+        // Instead, toggle the selected item
 
-    const delimiter = this.currentField.delimiter || ',';
+        const delimiter = this.currentField.delimiter || ',';
 
-    // Get the current value and split it into array of selected items
-    let currentValue = this.inputBox.value || '';
-    let selectedItems = currentValue
-      .split(delimiter)
-      .map(item => item.trim())
-      .filter(item => item.length > 0);
+        // Get the current value and split it into array of selected items
+        let currentValue = this.inputBox.value || '';
+        let selectedItems = currentValue
+          .split(delimiter)
+          .map(item => item.trim())
+          .filter(item => item.length > 0);
 
-    // Check if the item is already selected
-    const existingIndex = selectedItems.findIndex(item =>
-      item.toLowerCase() === text.toLowerCase()
-    );
+        // Check if the item is already selected
+        const existingIndex = selectedItems.findIndex(item =>
+          item.toLowerCase() === text.toLowerCase()
+        );
 
-    // If already selected, remove it; otherwise add it
-    if (existingIndex !== -1) {
-      selectedItems.splice(existingIndex, 1);
-    } else {
-      selectedItems.push(text);
-    }
+        // If already selected, remove it; otherwise add it
+        if (existingIndex !== -1) {
+          selectedItems.splice(existingIndex, 1);
+        } else {
+          selectedItems.push(text);
+        }
 
-    // Update the input value with the new selection
-    this.inputBox.value = selectedItems.join(delimiter + ' ');
+        // Update the input value with the new selection
+        this.inputBox.value = selectedItems.join(delimiter + ' ');
 
-    // Keep the input box focused
-    this.inputBoxChanged = true;
-    if (this.$refs.input) {
-      this.$refs.input.focus();
-    }
+        // Keep the input box focused
+        this.inputBoxChanged = true;
+        if (this.$refs.input) {
+          this.$refs.input.focus();
+        }
 
-    // Critical fix: DO NOT close the dropdown, instead refresh it
-    this.calAutocompleteList(true);
-    
-    // Make sure the dropdown stays visible
-    this.inputBoxShow = true;
-    this.focused = true;
-    
-    return; // Important! Return early to avoid closing the dropdown
-  } else {
-    // Original behavior for non-multiselect fields
-    this.autocompleteInputs = [];
-    this.autocompleteSelect = -1;
-    this.inputBoxShow = 0;
-    this.inputBoxChanged = false;
-    setTimeout(() => {
-      this.inputCellWrite(text);
-    });
-  }
+        // Critical fix: DO NOT close the dropdown, instead refresh it
+        this.calAutocompleteList(true);
+        
+        // Make sure the dropdown stays visible
+        this.inputBoxShow = true;
+        this.focused = true;
+        
+        return; // Important! Return early to avoid closing the dropdown
+      } else {
+        // Original behavior for non-multiselect fields
+        this.autocompleteInputs = [];
+        this.autocompleteSelect = -1;
+        this.inputBoxShow = 0;
+        this.inputBoxChanged = false;
+        setTimeout(() => {
+          this.inputCellWrite(text);
+        });
+      }
     },
     
     isItemSelected(item) {
@@ -3367,7 +3470,7 @@ export default defineComponent({
     },
     // Toggle selection of a multiselect item
     toggleMultiselectItem(item) {
-      console.log('toggleMultiselectItem called with:', item);
+      // console.log('toggleMultiselectItem called with:', item);
       // if (!this.currentField || this.currentField.type !== 'multiselect') return;
       if (!this.currentField || this.currentField.type !== 'multiselect') {
         console.log('Not a multiselect field');
@@ -3418,7 +3521,7 @@ export default defineComponent({
     e.preventDefault();
     e.stopPropagation();
   }
-      console.log('applyMultiselectChoices called');
+      // console.log('applyMultiselectChoices called');
       
       if (!this.currentField || this.currentField.type !== 'multiselect') return;
       
@@ -3452,7 +3555,7 @@ export default defineComponent({
 },
     // Clear all multiselect choices
     clearMultiselectChoices() {
-      console.log('clearMultiselectChoices called');
+      // console.log('clearMultiselectChoices called');
       
       if (!this.currentField || this.currentField.type !== 'multiselect') return;
       
@@ -3551,7 +3654,7 @@ export default defineComponent({
   //   this.updateInputBoxValue(); // Call further logic if needed
   // },
   handleCheckboxClick(event) {
-    console.log('Checkbox was clicked:', event.target.value);
+    // console.log('Checkbox was clicked:', event.target.value);
     
     // Maintain focused state to ensure the dropdown remains open
     this.focused = true;
@@ -3571,22 +3674,15 @@ export default defineComponent({
     if (this.currentField.type === 'multiselect') {
       // this.inputBox.value = this.selectedItemsForAutocomplete.join(', ');
       this.$refs.inputBox.value = this.selectedItemsForAutocomplete.join(', ');
-      console.log(this.selectedItemsForAutocomplete);
-      console.log('Updated input box value:', this.inputBox.value); // Another verification method
+      // console.log(this.selectedItemsForAutocomplete);
+      // console.log('Updated input box value:', this.inputBox.value); // Another verification method
     }
   },
-  clickOutside(e) {
-    console.log("Click Outside");
-      if (!this.$refs.autocomplete.contains(e.target)) {
-        this.focused = false; // Close dropdown only if the click is outside
-      }
-      
-    },
- 
     updateDisplayedItems() {
   // This triggers reactivity, and the cell will update automatically
   this.focused = true; // Maintain focus based on interactions
-  console.log(this.selectedItemsForAutocomplete);
+  // console.log("selctedItemsForAutocomplete");
+  // console.log(this.selectedItemsForAutocomplete);
 
   
   // Check if selectedItemsForAutocomplete is not empty before joining
@@ -3870,10 +3966,11 @@ input:focus, input:active:focus, input.active:focus {
   z-index: 2;
 }
 .systable tbody td.sticky-column {
-  background-color: white;
+  background-color: pink;
 }
 .systable thead th.sticky-column {
   z-index: 7;
+  background-color: pink;
 }
 .systable thead td.sticky-column {
   z-index: 6;
@@ -4079,6 +4176,15 @@ a:disabled {
   background-size: 9px 9px;
   background-position: right 5px top 3px;
 }
+/* .sticky-sign {
+  background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgNTAwIj4KICA8cmVjdCB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCIgZmlsbD0iYmxhY2siLz4KICA8cmVjdCB4PSIxODAiIHk9IjcwIiB3aWR0aD0iMTIwIiBoZWlnaHQ9IjkwIiBmaWxsPSJ3aGl0ZSIvPgogIDxyZWN0IHg9IjM1MCIgeT0iNzAiIHdpZHRoPSIxMjAiIGhlaWdodD0iOTAiIGZpbGw9IndoaXRlIi8+CiAgPHJlY3QgeD0iMTgwIiB5PSIxOTUiIHdpZHRoPSIxMjAiIGhlaWdodD0iOTAiIGZpbGw9IndoaXRlIi8+CiAgPHJlY3QgeD0iMzUwIiB5PSIxOTUiIHdpZHRoPSIxMjAiIGhlaWdodD0iOTAiIGZpbGw9IndoaXRlIi8+CiAgPHJlY3QgeD0iMTgwIiB5PSIzMjAiIHdpZHRoPSIxMjAiIGhlaWdodD0iOTAiIGZpbGw9IndoaXRlIi8+CiAgPHJlY3QgeD0iMzUwIiB5PSIzMjAiIHdpZHRoPSIxMjAiIGhlaWdodD0iOTAiIGZpbGw9IndoaXRlIi8+CiAgPHBvbHlnb24gcG9pbnRzPSIzMCw3MCAxNTAsNzAgMzAsMTUwIiBmaWxsPSJ3aGl0ZSIvPgogIDxwb2x5Z29uIHBvaW50cz0iMzAsMTUwIDE1MCwxNTAgMzAsMjMwIiBmaWxsPSJ3aGl0ZSIvPgogIDxwb2x5Z29uIHBvaW50cz0iMzAsMjMwIDE1MCwyMzAgMzAsMzEwIiBmaWxsPSJ3aGl0ZSIvPgogIDxwb2x5Z29uIHBvaW50cz0iMzAsMzEwIDE1MCwzMTAgMzAsMzkwIiBmaWxsPSJ3aGl0ZSIvPgogIDxwb2x5Z29uIHBvaW50cz0iMzAsMzkwIDE1MCwzOTAgMzAsNDcwIDMwLDQxMCIgZmlsbD0id2hpdGUiLz4KPC9zdmc+');
+  background-repeat: no-repeat;
+  background-size: 9px 9px;
+  background-position: right 5px top 20px;
+} */
+
+
+
 .filter-sign {
   background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAlCAMAAABiU6n+AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAhUExURQAAAK+vr6+np6+qqq+pqa+qqq2pqa+srK+srK+rq6+rq01/tHwAAAAKdFJOUwAQIDBQYICv3+8SoWj4AAAACXBIWXMAABcRAAAXEQHKJvM/AAAAiUlEQVQ4T+3OOxaAMAhEUfwmsv8FazLjMRBiZ+er4ExzJelLSSZeUccisvMO2uUq8+nKU5lXfl1bWWWkS1gHuuJCoa66UKCDCwU6ulCnu13I6x4XcrrGhYyudSGjMy7U6KwLPTrvQhwDV42jaueqcVTl7+L4zzaO386Zv+teZ/6u9xXzcK2zXUVOdLIT4IImCksAAAAASUVORK5CYII=');
   background-repeat: no-repeat;
@@ -4215,3 +4321,5 @@ td.hideDuplicate:not(.focus) {
   border-color: #43a047;
 }
 </style>
+
+
