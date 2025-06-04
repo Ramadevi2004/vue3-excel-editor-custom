@@ -2910,9 +2910,13 @@ export default defineComponent({
         this.showDatePickerDiv()
       }
     },
-    inputCellWrite (setText, colPos, recPos) {
+    inputCellWrite (setText, colPos, recPos,isDropdownSelection) {
       let field = this.currentField
       if (typeof colPos !== 'undefined') field = this.fields[colPos]
+      if (field.type === "multiselect" && !isDropdownSelection) {
+        console.warn("Manual editing is disabled for multiselect fields.");
+        return; // Block manual entry
+      }
       if (typeof recPos === 'undefined') recPos = this.pageTop + this.currentRowPos
       if (!this.noMassUpdate && typeof this.selected[recPos] !== 'undefined')
         this.updateSelectedRows(field, setText)
@@ -3691,7 +3695,8 @@ export default defineComponent({
                 : '';  // If empty, set value as an empty string
   
   // Use inputCellWrite to update the input box
-  this.inputCellWrite(value);
+  // this.inputCellWrite(value);
+  this.inputCellWrite(value,undefined,undefined,true);
 }
 
 
