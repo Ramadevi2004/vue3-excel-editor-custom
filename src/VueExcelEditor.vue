@@ -163,8 +163,8 @@
         <div v-show="textTip" ref="texttip" class="text-tip" v-html="textTip"></div>
 
         <!-- Editor Square -->
-        <div v-show="focused" ref="inputSquare" class="input-square" @mousedown="inputSquareClick">
-          <div style="position: relative; height: 100%; padding: 2px 2px 1px">
+        <div v-show="focused" ref="inputSquare" class="input-square" @mousedown="inputSquareClick" @mouseenter="updateTextTip">
+          <div style="position: relative; height: 100%; padding: 2px 2px 1px" >
             <div class="rb-square" />
             <textarea ref="inputBox"
                       id="inputBox"
@@ -173,6 +173,7 @@
                       @blur="inputBoxBlur"
                       @mousemove="inputBoxMouseMove"
                       @mousedown="inputBoxMouseDown"
+                      @input="updateTextTip"
                       trim
                       autocomplete="off"
                       autocorrect="off"
@@ -2897,8 +2898,10 @@ export default defineComponent({
         && e.target.offsetWidth - e.offsetX < 15)
         cursor = 'pointer'
       e.target.style.cursor = cursor
+      this.updateTextTip(e);
     },
     inputBoxMouseDown (e) {
+      this.updateTextTip(e);
       if (e.target.offsetWidth - e.offsetX > 15) return
       if (this.currentField.readonly) return
       if (this.currentField.options) {
@@ -2909,6 +2912,21 @@ export default defineComponent({
         e.preventDefault()
         this.showDatePickerDiv()
       }
+    },
+    updateTextTip(event) {
+      const cell = this.inputBox;
+      this.textTip = this.inputBox.value  ; // Update tooltip text dynamically
+      const fieldName = this.currentField.label
+      if (fieldName === "Data Dictionary Product Name") {
+        this.textTip = this.textTip.split(",").map(item => item.trim()).join("<br>"); // Splitting by comma and adding line breaks
+      }
+      // Get position of the input field
+      const rect = cell.getBoundingClientRect();
+      this.$refs.texttip.style.top = `${rect.top - 14}px`;
+      this.$refs.texttip.style.left = `${rect.right + 8}px`;
+
+      // Show the tooltip only if there is content
+      this.$refs.texttip.style.display = this.textTip ? "block" : "none";
     },
     inputCellWrite (setText, colPos, recPos,isDropdownSelection) {
       let field = this.currentField
@@ -3375,9 +3393,13 @@ export default defineComponent({
             const r = this.$refs.autocomplete.getBoundingClientRect()
             if (rect.bottom + r.height > window.innerHeight) {
               // show at top
-              this.autocompleteInputs.reverse()
-              this.autocompleteSelect = this.autocompleteInputs.length - this.autocompleteSelect - 1
+              // this.autocompleteInputs.reverse()
+              //this.autocompleteSelect = this.autocompleteInputs.length - this.autocompleteSelect - 1
               this.$refs.autocomplete.style.top = (rect.top - r.height) + 'px'
+              // this.$refs.autocomplete.style.top =  `${rect.top-r.height}`;
+              // // Adjust height to fit within available space
+              // this.$refs.autocomplete.style.height = `${rect.top}px`;
+              // this.$refs.autocomplete.style.top =  `${rect.top-this.$refs.autocomplete.style.height}`;
             }
             else {
               this.$refs.autocomplete.style.top = rect.bottom + 'px'
@@ -3971,13 +3993,16 @@ input:focus, input:active:focus, input.active:focus {
   z-index: 2;
 }
 .systable tbody td.sticky-column {
-  background-color: pink;
+  background-color: white;
+  border-right: 2px solid black;
 }
 .systable thead th.sticky-column {
   z-index: 7;
-  background-color: pink;
+  /* background-color: white; */
+  border-right: 2px solid black;
 }
 .systable thead td.sticky-column {
+  border-right: 2px solid black;
   z-index: 6;
 }
 .systable thead td.first-col, .systable thead th.first-col {
@@ -4324,6 +4349,10 @@ td.hideDuplicate:not(.focus) {
   background: #4caf50;
   color: white;
   border-color: #43a047;
+}
+.autocomplete-result-checkbox{
+  margin-right: 10px;
+  padding: 10px
 }
 </style>
 
