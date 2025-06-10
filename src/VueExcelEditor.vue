@@ -230,14 +230,18 @@
       <template v-if="currentField && currentField.type === 'multiselect'">
       <li v-for="(item, i) in autocompleteInputs" :key="i">
         <label class="autocomplete-result-label">
-          <input
+          <div>
+            <input
             type="checkbox"
             :value="item"
             v-model="selectedItemsForAutocomplete"
             @change="updateDisplayedItems(item)"
             class="autocomplete-result-checkbox"
           />
-          <span>{{ item }}</span>
+          </div>
+          <div>
+            <span>{{ item }}</span>
+          </div>
         </label>
       </li>
       </template>
@@ -3754,6 +3758,7 @@ input:focus, input:active:focus, input.active:focus {
   border: 1px solid rgb(108, 143, 108);
   /*height: fit-content;*/
   overflow-y: scroll;
+  overflow-x: hidden; /* Prevent horizontal scrollbar */
   font-size: 0.88rem;
   max-width: 300px;
   max-height: 235px;
@@ -3771,8 +3776,46 @@ input:focus, input:active:focus, input.active:focus {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  cursor: pointer
+  cursor: pointer;
 }
+
+/* Fix for multiselect checkbox layout */
+.autocomplete-results li {
+  list-style: none;
+}
+
+.autocomplete-result-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 2px;
+  width: 100%;
+}
+
+.autocomplete-result-label > div:first-child {
+  flex-shrink: 0; /* Checkbox container won't shrink */
+}
+
+.autocomplete-result-checkbox {
+  margin: 0;
+  margin-top: 2px; /* Align with first line of text */
+}
+
+.autocomplete-result-label > div:last-child {
+  flex: 1; /* Text container takes remaining space */
+  min-width: 0; /* Allow shrinking */
+  overflow-x: hidden; /* Force text to wrap instead of overflow */
+}
+
+.autocomplete-result-label span {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  display: block; /* Ensures proper text wrapping */
+  width: 100%;
+}
+
 .autocomplete-result.select {
   background-color: lightsteelblue;
 }
@@ -4350,10 +4393,7 @@ td.hideDuplicate:not(.focus) {
   color: white;
   border-color: #43a047;
 }
-.autocomplete-result-checkbox{
-  margin-right: 10px;
-  padding: 10px
-}
+
 </style>
 
-
+ 
