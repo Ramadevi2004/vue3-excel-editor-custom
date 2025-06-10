@@ -3783,6 +3783,7 @@ input:focus, input:active:focus, input.active:focus {
 /* Fix for multiselect checkbox layout */
 .autocomplete-results li {
   list-style: none;
+  overflow: visible; /* <-- ADDED THIS LINE */
 }
 
 .autocomplete-result-label {
@@ -3792,6 +3793,7 @@ input:focus, input:active:focus, input.active:focus {
   cursor: pointer;
   padding: 4px 2px;
   width: 100%;
+  overflow: visible; /* <-- ADDED THIS LINE */
 }
 
 .autocomplete-result-label > div:first-child {
@@ -3804,9 +3806,9 @@ input:focus, input:active:focus, input.active:focus {
 }
 
 .autocomplete-result-label > div:last-child {
-  flex: 1; /* Text container takes remaining space */
-  min-width: 0; /* Allow shrinking */
-  overflow-x: hidden; /* Force text to wrap instead of overflow */
+  flex: 1;
+  min-width: 0;
+  overflow: visible; /* <-- CHANGED FROM overflow-x: hidden TO THIS */
 }
 
 .autocomplete-result-label span {
