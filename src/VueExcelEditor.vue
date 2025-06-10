@@ -3769,6 +3769,7 @@ input:focus, input:active:focus, input.active:focus {
   66% { opacity: 0; }
   100% { opacity: 1; }
 }
+
 .autocomplete-result {
   list-style: none;
   text-align: left;
@@ -3809,7 +3810,7 @@ input:focus, input:active:focus, input.active:focus {
 }
 
 .autocomplete-result-label span {
-  word-wrap: break-word;
+  word-wrap: normal;
   overflow-wrap: break-word;
   white-space: normal;
   display: block; /* Ensures proper text wrapping */
