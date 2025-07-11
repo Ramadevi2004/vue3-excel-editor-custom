@@ -86,6 +86,7 @@
                                 :colspan="p === fields.length - 1? 2: 1"
                                 :key="`th2-${p}`"
                                 v-model="columnFilter[p]"
+                                :interactive="false"
                                 :class="{'sticky-column': item.sticky}"
                                 :style="{left: item.left}"
                                 class="column-filter" />
@@ -1131,10 +1132,16 @@ export default defineComponent({
         if (filterColumnList.length === 0)
           this.table = this.filteredValue
         else {
+          let matchedCount = 0;
+          let totalCount = 0;
           this.table = this.filteredValue.filter((record) => {
+            totalCount++;
 
             // Record is created after the filter time
-            if (record.$id > this.lastFilterTime) return true
+            if (record.$id > this.lastFilterTime) {
+              matchedCount++;
+              return true;
+            }
 
             // Assume new record contains § in any of the key fields
             /*
@@ -1150,7 +1157,7 @@ export default defineComponent({
               if (this.fields[k].type === 'number' && filter[k].type <= 4)
                 content[k] = val
               else
-                content[k] = typeof val === 'undefined' || val === null ? '' : String(val).toUpperCase()
+                content[k] = typeof val === 'undefined' || val === null ? '' : String(val).trim().toUpperCase()
             })
 
             for (let i = 0; i < filterColumnList.length; i++) {
@@ -1188,8 +1195,10 @@ export default defineComponent({
                   break
                 case 10: // Multi-select "in:" filter
                   // Check if the cell value is in the array of selected values
-                  const cellValueUpper = `${content[k]}`;
-                  if (!filter[k].modelValue.includes(cellValueUpper)) return false;
+                  const cellValue = `${content[k]}`; // Already trimmed and uppercase
+                  if (!filter[k].modelValue.includes(cellValue)) {
+                    return false;
+                  }
                   break;
               }
             }
@@ -1197,8 +1206,6 @@ export default defineComponent({
           })
         }
       }
-
-      this.reviseSelectedAfterTableChange()
       if (this.showSelectedOnly) {
         this.table = this.table.filter((rec, i) => this.selected[i])
         this.reviseSelectedAfterTableChange()

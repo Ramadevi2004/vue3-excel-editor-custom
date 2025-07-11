@@ -83,28 +83,22 @@
                   autocapitalize="off"
                   spellcheck="false" 
                   @keyup="doInputFilter" 
-                  @keydown.exact.enter="doFilter" 
+                  @keydown.exact.enter.prevent
                 />
             </span>
           </div>
         </div>
 
         <div>
+          <div class="panel-action" style="margin-bottom: 10px;">
+            <button class="panel-button float-left" @click="selectAllItems" style="width: 48%; background-color: #28a745;">
+              Select All
+            </button>
+            <button class="panel-button float-right" @click="selectNoneItems" style="width: 48%; background-color: #dc3545;">
+              None
+            </button>
+          </div>
           <div ref="panelList" class="panel-list">
-            <div class="panel-list-item">
-              <label >
-                <div>
-                  <input
-                    type="checkbox"
-                    class="panel-checkbox"
-                    v-model="selectAll"
-                    @change="toggleSelectAll"
-                  />
-                  Select All
-                </div>
-              </label>
-              
-            </div>
             <div v-for="(item, k) in filteredSortedUniqueValueList.slice(0, nFilterCount)" :key="k"
               class="panel-list-item">
               <!-- <input type="checkbox" class="panel-checkbox" :id="'checkbox-'+k" :value="item" v-model="selectedItems" /> -->
@@ -112,16 +106,14 @@
               <!-- <label :for="'checkbox-'+k">{{ item }}</label> -->
               <label>
                 <div>
-                  <input type="checkbox" class="panel-checkbox" :value="item" v-model="selectedItems" @change="checkSelectAll"/>
-                  <!-- <input type="checkbox" class="panel-checkbox" :value="item" v-model="selectedItems" :checked="selectedItems.includes(item)" /> -->
-                  <!-- <input
-                    type="checkbox"
-                    class="panel-checkbox"
-                    :value="item"
-                    :checked="selectedItems.includes(item)"
-                    @change="updateSelectedList(item, $event.target.checked)"
-                  /> -->
-                  {{ item }}
+                  <input 
+                    type="checkbox" 
+                    class="panel-checkbox" 
+                    :value="item" 
+                    :checked="selectedItems.includes(item)" 
+                    @change="toggleItemSelection(item, $event.target.checked)"
+                  />
+                  {{ item === '' ? '(Empty)' : item }}
                 </div>
               </label>
             </div>
@@ -187,7 +179,6 @@ export default {
       inputFilterCondition: '',
       sortedUniqueValueList: [],
       selectedItems: [],
-      selectAll: false,
       isSticky:false
     }
   },
@@ -240,16 +231,25 @@ export default {
     },
   },
   methods: {
-    toggleSelectAll() {
-    if (this.selectAll) {
-      this.selectedItems = [...this.sortedUniqueValueList]; // Select all items
-    } else {
-      this.selectedItems = []; // Deselect all items
-    }
-  },
-    checkSelectAll() {
-      // If any checkbox is unchecked, deselect "Select All"
-      this.selectAll = this.selectedItems.length === this.filteredSortedUniqueValueList.length;
+    selectAllItems() {
+      this.selectedItems = [...this.sortedUniqueValueList];
+    },
+
+    selectNoneItems() {
+      this.selectedItems = [];
+    },
+
+    toggleItemSelection(item, isChecked) {
+      if (isChecked) {
+        if (!this.selectedItems.includes(item)) {
+          this.selectedItems.push(item);
+        }
+      } else {
+        const index = this.selectedItems.indexOf(item);
+        if (index > -1) {
+          this.selectedItems.splice(index, 1);
+        }
+      }
     },
 
 
@@ -271,9 +271,7 @@ export default {
     },
     freezePanelSizeAfterShown() {
       const target = this.$refs.panelList
-      console.log("target",target);
       const rect = target.getBoundingClientRect()
-      console.log("Rect",rect);
       target.setAttribute('style', `width:${rect.width}px; height:${rect.height}px;`)
     },
     removePanelSizeAfterHide() {
@@ -318,20 +316,20 @@ export default {
     // },
 
     doFilter() {
-      if (this.selectedItems.length > 0) {
-        // Create a special format that the parent component will recognize
-        // console.log("selected items",this.selectedItems);
+      // Check if all items are selected - if so, don't apply any filter (show all rows)
+      if (this.selectedItems.length === this.sortedUniqueValueList.length) {
+        // All items selected = no filter needed
+        this.columnFilterRef.$el.textContent = '';
+        this.columnFilterRef.$emit('update:modelValue', '');
+      } else if (this.selectedItems.length > 0) {
+        // Some items selected - apply filter
         const opt = `in:${this.selectedItems.join(',')}`
-        // Display the selected items in the UI
         this.columnFilterRef.$el.textContent = this.selectedItems.join(', ')
-
-        // Send the filter expression to the parent
         this.columnFilterRef.$emit('update:modelValue', opt)
       } else {
-        // Handle single filter case
-        const opt = this.inputFilterCondition + this.$refs.inputFilter.value
-        this.columnFilterRef.$el.textContent = opt
-        this.columnFilterRef.$emit('update:modelValue', opt)
+        // No items selected - this would hide all rows
+        this.columnFilterRef.$el.textContent = 'No items selected';
+        this.columnFilterRef.$emit('update:modelValue', 'HIDE_ALL_ROWS');
       }
 
       this.hidePanel()
@@ -360,27 +358,43 @@ export default {
         this.show = true
         setTimeout(() => (this.$refs.inputFilter.focus()))
 
-        const hash = {}
         const fieldName = this.$parent.fields[ref.colPos].name
-        // this.$parent.table.forEach(record => (hash[record[fieldName]] = true))
-        this.$parent.modelValue.forEach(record => (hash[record[fieldName]] = true))
-        // this.$parent.modelValue.forEach(record => (hash[record[fieldName]?.trim()] = true));
-        // console.log("modelvalue",this.$parent.modelValue);
-        const keys = Object.keys(hash)
-        // keys.sort()
-        keys.sort((a, b) => {
-      const aSelected = this.selectedItems.includes(a);
-      const bSelected = this.selectedItems.includes(b);
-      
-      if (aSelected && !bSelected) return -1; // Selected comes first
-      if (!aSelected && bSelected) return 1;  // Unselected comes later
-      return a.localeCompare(b); // Sort remaining items alphabetically
-    });
-        if (keys.length > 0 && keys[0] === '') keys[0] = ' '
-        this.sortedUniqueValueList = keys
-        // console.log("field name",fieldName);
-        // console.log("keys",keys);
-        // this.selectedItems = [...this.filteredSortedUniqueValueList]; // Pre-select items
+        
+        // Collect ALL unique values from the original dataset
+        const allValuesHash = {}
+        this.$parent.modelValue.forEach(record => {
+          const value = record[fieldName];
+          const trimmedValue = (typeof value === 'undefined' || value === null) ? '' : String(value).trim();
+          allValuesHash[trimmedValue] = true;
+        });
+        
+        // Collect unique values from currently filtered/visible rows
+        const visibleValuesHash = {}
+        this.$parent.table.forEach(record => {
+          const value = record[fieldName];
+          const trimmedValue = (typeof value === 'undefined' || value === null) ? '' : String(value).trim();
+          visibleValuesHash[trimmedValue] = true;
+        });
+
+        const allKeys = Object.keys(allValuesHash)
+        const visibleKeys = Object.keys(visibleValuesHash)
+        
+        // By default, select only the values that are currently visible in filtered rows
+        this.selectedItems = [...visibleKeys];
+        
+        // Sort all keys with selected items at the top
+        allKeys.sort((a, b) => {
+          const aSelected = this.selectedItems.includes(a);
+          const bSelected = this.selectedItems.includes(b);
+          
+          if (aSelected && !bSelected) return -1; // Selected comes first
+          if (!aSelected && bSelected) return 1;  // Unselected comes later
+          return a.localeCompare(b); // Sort remaining items alphabetically
+        });
+        
+        // Set the full list of unique values (now sorted with selected on top)
+        this.sortedUniqueValueList = allKeys
+
         setTimeout(() => this.freezePanelSizeAfterShown())
       })
     },
