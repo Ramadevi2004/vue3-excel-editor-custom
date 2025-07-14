@@ -1080,9 +1080,13 @@ export default defineComponent({
         filterColumnList.forEach((k) => {
           // Add new case for "in:" prefix for multi-select
           if (this.columnFilter[k].startsWith('in:')) {
-            // filter[k] = { type: 10, modelValue: this.columnFilter[k].slice(3).split(',').map(v => v.trim().toUpperCase()) }
             const values = this.columnFilter[k].slice(3).split(',').map(v => v.trim().toUpperCase())
-            filter[k] = { type: 10, modelValue: values }
+            // Handle special case for empty selection
+            if (values.length === 1 && values[0] === '__EMPTY_SELECTION__') {
+              filter[k] = { type: 11, modelValue: [] } // Type 11 for empty selection (show no rows)
+            } else {
+              filter[k] = { type: 10, modelValue: values }
+            }
           } else {
             switch (true) {
               case this.columnFilter[k].startsWith('<='):
@@ -1201,6 +1205,8 @@ export default defineComponent({
                     return false;
                   }
                   break;
+                case 11: // Empty selection - show no rows
+                  return false;
               }
             }
             return true

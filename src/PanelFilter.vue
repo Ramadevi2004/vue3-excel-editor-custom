@@ -123,7 +123,7 @@
                     :checked="selectedItems.includes(item)" 
                     @change="toggleItemSelection(item, $event.target.checked)"
                   />
-                  {{ item === '' ? '(Empty)' : item }}
+                  {{ item === '' ? '(Blanks)' : item }}
                 </div>
               </label>
             </div>
@@ -392,11 +392,19 @@ export default {
       this.allowSorting = true;
       
       let opt
-      if (this.selectedItems.length > 0) {
-        // Use the original logic - format as "in:" prefix for multi-select
-        opt = `in:${this.selectedItems.join(',')}`
-        this.columnFilterRef.$el.textContent = this.selectedItems.join(', ')
+      // Check if we have a unique value list (checkbox filtering mode)
+      if (this.sortedUniqueValueList.length > 0) {
+        // Always use "in:" format when in checkbox filtering mode
+        if (this.selectedItems.length > 0) {
+          opt = `in:${this.selectedItems.join(',')}`
+          this.columnFilterRef.$el.textContent = this.selectedItems.join(', ')
+        } else {
+          // No items selected = show no rows (use special empty filter)
+          opt = `in:__EMPTY_SELECTION__`
+          this.columnFilterRef.$el.textContent = '(None Selected)'
+        }
       } else {
+        // Fallback to text input filtering when no checkbox list is available
         opt = this.inputFilterCondition + this.$refs.inputFilter.value
         this.columnFilterRef.$el.textContent = opt
       }
