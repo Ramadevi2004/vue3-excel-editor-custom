@@ -90,20 +90,26 @@
         </div>
 
         <div>
-          <div class="panel-action" style="margin-bottom: 10px;">
-            <button class="panel-button float-left" @click="selectAllItems" style="width: 48%; background-color: #28a745;">
-              Select All
-            </button>
-            <button class="panel-button float-right" @click="selectNoneItems" style="width: 48%; background-color: #dc3545;">
-              None
-            </button>
-          </div>
           <div ref="panelList" class="panel-list">
-            <div v-for="(item, k) in filteredSortedUniqueValueList.slice(0, nFilterCount)" :key="k"
+            <!-- Select All Checkbox (Excel-style) -->
+            <div class="panel-list-item select-all-item">
+              <label>
+                <div>
+                  <input 
+                    type="checkbox" 
+                    class="panel-checkbox" 
+                    :checked="isSelectAllChecked"
+                    :indeterminate="isSelectAllIndeterminate"
+                    @change="toggleSelectAll($event.target.checked)"
+                  />
+                  <strong>Select All</strong>
+                </div>
+              </label>
+            </div>
+            
+            <!-- Individual Items -->
+            <div v-for="item in filteredSortedUniqueValueList.slice(0, nFilterCount)" :key="item"
               class="panel-list-item">
-              <!-- <input type="checkbox" class="panel-checkbox" :id="'checkbox-'+k" :value="item" v-model="selectedItems" /> -->
-              <!-- <span>{{ item }}</span> -->
-              <!-- <label :for="'checkbox-'+k">{{ item }}</label> -->
               <label>
                 <div>
                   <input 
@@ -125,7 +131,10 @@
       </div>
 
       <div class="panel-footer">
-        <button class="panel-button" @click="doFilter">
+        <button class="panel-button cancel-button" @click="cancelFilter">
+          <span v-html="localizedLabel.cancel" />
+        </button>
+        <button class="panel-button apply-button" @click="doFilter">
           <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="sign-in-alt" role="img"
             xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"
             class="svg-inline--fa fa-sign-in-alt fa-w-16 fa-fw fa-sm">
@@ -163,6 +172,7 @@ export default {
           customFilter: 'Custom Filter',
           listFirstNValuesOnly: n => `List first ${n} values only`,
           apply: 'Apply',
+          cancel: 'Cancel',
           freezeColumn: 'Freeze Column',
           unFreezeColumn: 'UnFreeze Column'
         }
@@ -179,7 +189,9 @@ export default {
       inputFilterCondition: '',
       sortedUniqueValueList: [],
       selectedItems: [],
-      isSticky:false
+      previousSelectedItems: [],
+      isSticky:false,
+      allowSorting: true // Flag to control when sorting should happen
     }
   },
   watch: {
@@ -200,11 +212,11 @@ export default {
     //   return this.sortedUniqueValueList.filter(item => item.toUpperCase().includes(filter))
     // },
     filteredSortedUniqueValueList() {
-    // const filter = this.inputFilter.toUpperCase();
     const filter = this.inputFilter;
     const condition = this.inputFilterCondition; // Store the selected filter condition
 
-    return this.sortedUniqueValueList.filter(item => {
+    // First filter items based on the search criteria
+    const filteredItems = this.sortedUniqueValueList.filter(item => {
       if (!filter) return true; // Show everything if no input exists
       if (condition === "=") return item == filter; // Exact match
       if (condition === "<") return parseFloat(item) < parseFloat(filter); // Less than
@@ -215,8 +227,25 @@ export default {
       if (condition === "~") return new RegExp(filter).test(item); // Regular Expression match
 
       return item.toUpperCase().includes(filter.toUpperCase()); // Default: Partial match
-      // return item.includes(filter.trim());
     });
+
+    // Sort by selection status only when allowSorting is true (panel open/apply)
+    if (this.allowSorting) {
+      return filteredItems.sort((a, b) => {
+        const aSelected = this.selectedItems.includes(a);
+        const bSelected = this.selectedItems.includes(b);
+        
+        // Selected items first, then unselected
+        if (aSelected && !bSelected) return -1;
+        if (!aSelected && bSelected) return 1;
+        
+        // Within same selection status, sort alphabetically
+        return a.localeCompare(b);
+      });
+    } else {
+      // Just alphabetical sort when not allowing sort by selection
+      return filteredItems.sort((a, b) => a.localeCompare(b));
+    }
   },
 
 
@@ -229,10 +258,41 @@ export default {
         default: return this.inputFilterCondition
       }
     },
+
+    // Excel-style Select All checkbox states
+    isSelectAllChecked() {
+      const visibleItems = this.filteredSortedUniqueValueList;
+      if (visibleItems.length === 0) return false;
+      return visibleItems.every(item => this.selectedItems.includes(item));
+    },
+
+    isSelectAllIndeterminate() {
+      const visibleItems = this.filteredSortedUniqueValueList;
+      if (visibleItems.length === 0) return false;
+      const selectedCount = visibleItems.filter(item => this.selectedItems.includes(item)).length;
+      return selectedCount > 0 && selectedCount < visibleItems.length;
+    },
   },
   methods: {
-    selectAllItems() {
-      this.selectedItems = [...this.sortedUniqueValueList];
+    // Excel-style Select All toggle
+    toggleSelectAll(isChecked) {
+      // Disable sorting during selection to keep items in place
+      this.allowSorting = false;
+      
+      const visibleItems = this.filteredSortedUniqueValueList;
+      if (isChecked) {
+        // Add all visible items to selection (avoiding duplicates)
+        visibleItems.forEach(item => {
+          if (!this.selectedItems.includes(item)) {
+            this.selectedItems.push(item);
+          }
+        });
+      } else {
+        // Remove all visible items from selection
+        this.selectedItems = this.selectedItems.filter(item => 
+          !visibleItems.includes(item)
+        );
+      }
     },
 
     selectNoneItems() {
@@ -240,6 +300,9 @@ export default {
     },
 
     toggleItemSelection(item, isChecked) {
+      // Disable sorting during selection to keep items in place
+      this.allowSorting = false;
+      
       if (isChecked) {
         if (!this.selectedItems.includes(item)) {
           this.selectedItems.push(item);
@@ -282,6 +345,11 @@ export default {
       if (window.delay) clearTimeout(window.delay)
       window.delay = setTimeout(() => {
         this.inputFilter = this.$refs.inputFilter.value
+        
+        // Automatically deselect items that are not in the filtered results
+        this.selectedItems = this.selectedItems.filter(item => 
+          this.filteredSortedUniqueValueList.includes(item)
+        )
       }, 200)
     },
     // doFilter() {
@@ -316,22 +384,25 @@ export default {
     // },
 
     doFilter() {
-      // Check if all items are selected - if so, don't apply any filter (show all rows)
-      if (this.selectedItems.length === this.sortedUniqueValueList.length) {
-        // All items selected = no filter needed
-        this.columnFilterRef.$el.textContent = '';
-        this.columnFilterRef.$emit('update:modelValue', '');
-      } else if (this.selectedItems.length > 0) {
-        // Some items selected - apply filter
-        const opt = `in:${this.selectedItems.join(',')}`
+      // Enable sorting when filter is applied
+      this.allowSorting = true;
+      
+      let opt
+      if (this.selectedItems.length > 0) {
+        // Use the original logic - format as "in:" prefix for multi-select
+        opt = `in:${this.selectedItems.join(',')}`
         this.columnFilterRef.$el.textContent = this.selectedItems.join(', ')
-        this.columnFilterRef.$emit('update:modelValue', opt)
       } else {
-        // No items selected - this would hide all rows
-        this.columnFilterRef.$el.textContent = 'No items selected';
-        this.columnFilterRef.$emit('update:modelValue', 'HIDE_ALL_ROWS');
+        opt = this.inputFilterCondition + this.$refs.inputFilter.value
+        this.columnFilterRef.$el.textContent = opt
       }
+      this.columnFilterRef.$emit('update:modelValue', opt)
+      this.hidePanel()
+    },
 
+    cancelFilter() {
+      // Restore the previous selection state
+      this.selectedItems = [...this.previousSelectedItems]
       this.hidePanel()
     },
 
@@ -360,40 +431,47 @@ export default {
 
         const fieldName = this.$parent.fields[ref.colPos].name
         
-        // Collect ALL unique values from the original dataset
-        const allValuesHash = {}
+        // Collect unique values from the original dataset
+        const valuesHash = {}
         this.$parent.modelValue.forEach(record => {
           const value = record[fieldName];
           const trimmedValue = (typeof value === 'undefined' || value === null) ? '' : String(value).trim();
-          allValuesHash[trimmedValue] = true;
-        });
-        
-        // Collect unique values from currently filtered/visible rows
-        const visibleValuesHash = {}
-        this.$parent.table.forEach(record => {
-          const value = record[fieldName];
-          const trimmedValue = (typeof value === 'undefined' || value === null) ? '' : String(value).trim();
-          visibleValuesHash[trimmedValue] = true;
+          valuesHash[trimmedValue] = true;
         });
 
-        const allKeys = Object.keys(allValuesHash)
-        const visibleKeys = Object.keys(visibleValuesHash)
+        const keys = Object.keys(valuesHash)
         
-        // By default, select only the values that are currently visible in filtered rows
-        this.selectedItems = [...visibleKeys];
+        // Check if there's an existing filter applied
+        const colPos = this.columnFilterRef.colPos;
+        const existingFilter = this.$parent.columnFilter[colPos];
         
-        // Sort all keys with selected items at the top
-        allKeys.sort((a, b) => {
-          const aSelected = this.selectedItems.includes(a);
-          const bSelected = this.selectedItems.includes(b);
-          
-          if (aSelected && !bSelected) return -1; // Selected comes first
-          if (!aSelected && bSelected) return 1;  // Unselected comes later
-          return a.localeCompare(b); // Sort remaining items alphabetically
-        });
+        if (existingFilter && existingFilter.startsWith('in:')) {
+          // Parse existing "in:" filter to get selected items
+          const selectedValues = existingFilter.slice(3).split(',').map(item => item.trim());
+          this.selectedItems = selectedValues.filter(item => keys.includes(item));
+        } else if (existingFilter) {
+          // For other filter types, fallback to textContent parsing
+          const existingFilterText = this.columnFilterRef.$el.textContent.trim();
+          if (existingFilterText && existingFilterText !== '') {
+            const selectedFromFilter = existingFilterText.split(', ').map(item => item.trim());
+            this.selectedItems = selectedFromFilter.filter(item => keys.includes(item));
+          } else {
+            // By default, select all items
+            this.selectedItems = [...keys];
+          }
+        } else {
+          // By default, select all items (original logic)
+          this.selectedItems = [...keys];
+        }
         
-        // Set the full list of unique values (now sorted with selected on top)
-        this.sortedUniqueValueList = allKeys
+        // Save the current state as previous state for potential cancellation
+        this.previousSelectedItems = [...this.selectedItems];
+        
+        // Enable sorting when panel opens
+        this.allowSorting = true;
+        
+        // Don't sort here - let the computed property handle sorting
+        this.sortedUniqueValueList = keys
 
         setTimeout(() => this.freezePanelSizeAfterShown())
       })
@@ -561,6 +639,18 @@ div.panel-title span, button.panel-button span {
   cursor: pointer;
 }
 
+.cancel-button {
+  margin-right: 8px;
+}
+
+.cancel-button:hover {
+  background-color: #0056b3;
+}
+
+.apply-button:hover {
+  background-color: #0056b3;
+}
+
 .float-left {
   float: left !important;
 }
@@ -601,6 +691,17 @@ div.panel-title span, button.panel-button span {
 .panel-list-item:not(:last-child) {
   border-bottom: 1px solid lightgray;
 }
+
+.select-all-item {
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6 !important;
+  font-weight: bold;
+}
+
+.select-all-item:hover {
+  background-color: #e9ecef !important;
+}
+
 .normal-text {
   font-size: 0.88rem;
   color: gray;

@@ -477,7 +477,8 @@ export default defineComponent({
           missingKeyColumn: 'Missing key column',
           noRecordIndicator: 'No record',
           freezeColumn: 'Freeze Column',
-          unFreezeColumn: 'UnFreeze Column'
+          unFreezeColumn: 'UnFreeze Column',
+          cancel: 'Cancel'
         }
       }
     },
