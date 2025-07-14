@@ -549,7 +549,8 @@ input:focus, button:focus {
   border: none;
   font-size: 1.4rem;
   cursor: pointer;
-  color: #dc3545;
+  color: white;
+  background-color: red;
   padding: 0;
   width: 24px;
   height: 24px;
@@ -559,10 +560,6 @@ input:focus, button:focus {
   border-radius: 3px;
 }
 
-.panel-close-btn:hover {
-  background-color: #f8d7da;
-  color: #721c24;
-}
 
 div.panel-title span, button.panel-button span {
   margin-left: 6px;
