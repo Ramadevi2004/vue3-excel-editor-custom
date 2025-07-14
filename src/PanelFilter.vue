@@ -435,9 +435,9 @@ export default {
 
         const fieldName = this.$parent.fields[ref.colPos].name
         
-        // Collect unique values from the original dataset
+        // Collect unique values from the currently filtered/visible dataset (not original)
         const valuesHash = {}
-        this.$parent.modelValue.forEach(record => {
+        this.$parent.table.forEach(record => {
           const value = record[fieldName];
           const trimmedValue = (typeof value === 'undefined' || value === null) ? '' : String(value).trim();
           valuesHash[trimmedValue] = true;
