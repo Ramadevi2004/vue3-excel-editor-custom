@@ -138,7 +138,7 @@
         <button class="panel-button cancel-button" @click="cancelFilter">
           <span v-html="localizedLabel.cancel" />
         </button>
-        <button class="panel-button apply-button" @click="doFilter">
+        <button class="panel-button apply-button" @click="doFilter" :disabled="selectedItems.length === 0">
           <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="sign-in-alt" role="img"
             xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"
             class="svg-inline--fa fa-sign-in-alt fa-w-16 fa-fw fa-sm">
@@ -275,6 +275,11 @@ export default {
       if (visibleItems.length === 0) return false;
       const selectedCount = visibleItems.filter(item => this.selectedItems.includes(item)).length;
       return selectedCount > 0 && selectedCount < visibleItems.length;
+    },
+
+    // Disable Apply button when all items are deselected (Excel behavior)
+    isApplyDisabled() {
+      return this.sortedUniqueValueList.length > 0 && this.selectedItems.length === 0;
     },
   },
   methods: {
@@ -443,7 +448,7 @@ export default {
 
         const fieldName = this.$parent.fields[ref.colPos].name
         
-        // Collect unique values from the currently filtered/visible dataset (not original)
+        // Collect unique values from the currently filtered/visible dataset first
         const valuesHash = {}
         this.$parent.table.forEach(record => {
           const value = record[fieldName];
@@ -451,7 +456,19 @@ export default {
           valuesHash[trimmedValue] = true;
         });
 
-        const keys = Object.keys(valuesHash)
+        let keys = Object.keys(valuesHash)
+        
+        // If no values found in filtered data (e.g., after deselecting all), 
+        // fall back to original dataset so user can see all possible values
+        if (keys.length === 0) {
+          const originalValuesHash = {}
+          this.$parent.modelValue.forEach(record => {
+            const value = record[fieldName];
+            const trimmedValue = (typeof value === 'undefined' || value === null) ? '' : String(value).trim();
+            originalValuesHash[trimmedValue] = true;
+          });
+          keys = Object.keys(originalValuesHash)
+        }
         
         // Check if there's an existing filter applied
         const colPos = this.columnFilterRef.colPos;
@@ -459,12 +476,18 @@ export default {
         
         if (existingFilter && existingFilter.startsWith('in:')) {
           // Parse existing "in:" filter to get selected items
-          const selectedValues = existingFilter.slice(3).split(',').map(item => item.trim());
-          this.selectedItems = selectedValues.filter(item => keys.includes(item));
+          const filterContent = existingFilter.slice(3);
+          if (filterContent === '__EMPTY_SELECTION__') {
+            // Special case: empty selection - start with no items selected
+            this.selectedItems = [];
+          } else {
+            const selectedValues = filterContent.split(',').map(item => item.trim());
+            this.selectedItems = selectedValues.filter(item => keys.includes(item));
+          }
         } else if (existingFilter) {
           // For other filter types, fallback to textContent parsing
           const existingFilterText = this.columnFilterRef.$el.textContent.trim();
-          if (existingFilterText && existingFilterText !== '') {
+          if (existingFilterText && existingFilterText !== '' && existingFilterText !== '(None Selected)') {
             const selectedFromFilter = existingFilterText.split(', ').map(item => item.trim());
             this.selectedItems = selectedFromFilter.filter(item => keys.includes(item));
           } else {
@@ -683,6 +706,17 @@ div.panel-title span, button.panel-button span {
 
 .apply-button:hover {
   background-color: #0056b3;
+}
+
+.apply-button:disabled {
+  background-color: #cccccc !important;
+  color: #666666 !important;
+  cursor: not-allowed !important;
+  opacity: 0.6;
+}
+
+.apply-button:disabled:hover {
+  background-color: #cccccc !important;
 }
 
 .float-left {
