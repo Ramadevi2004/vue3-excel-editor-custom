@@ -210,47 +210,91 @@ export default {
   },
 
   computed: {
-    // filteredSortedUniqueValueList() {
-    //   console.log("input filter selected",this.inputFilterCondition);
-    //   const filter = this.inputFilter.toUpperCase()
-    //   return this.sortedUniqueValueList.filter(item => item.toUpperCase().includes(filter))
-    // },
     filteredSortedUniqueValueList() {
-    const filter = this.inputFilter;
-    const condition = this.inputFilterCondition; // Store the selected filter condition
+      const filter = this.inputFilter;
+      const condition = this.inputFilterCondition;
 
-    // First filter items based on the search criteria
-    const filteredItems = this.sortedUniqueValueList.filter(item => {
-      if (!filter) return true; // Show everything if no input exists
-      if (condition === "=") return item == filter; // Exact match
-      if (condition === "<") return parseFloat(item) < parseFloat(filter); // Less than
-      if (condition === "<=") return parseFloat(item) <= parseFloat(filter); // Less than or equal to
-      if (condition === ">") return parseFloat(item) > parseFloat(filter); // Greater than
-      if (condition === ">=") return parseFloat(item) >= parseFloat(filter); // Greater than or equal to
-      if (condition === "<>") return item != filter; // Not match
-      if (condition === "~") return new RegExp(filter).test(item); // Regular Expression match
-
-      return item.toUpperCase().includes(filter.toUpperCase()); // Default: Partial match
-    });
-
-    // Sort by selection status only when allowSorting is true (panel open/apply)
-    if (this.allowSorting) {
-      return filteredItems.sort((a, b) => {
-        const aSelected = this.selectedItems.includes(a);
-        const bSelected = this.selectedItems.includes(b);
+      // First filter items based on the search criteria
+      const filteredItems = this.sortedUniqueValueList.filter(item => {
+        if (!filter) return true;
         
-        // Selected items first, then unselected
-        if (aSelected && !bSelected) return -1;
-        if (!aSelected && bSelected) return 1;
+        const itemStr = String(item);
+        const filterStr = String(filter);
         
-        // Within same selection status, sort alphabetically
-        return a.localeCompare(b);
+        // Exact match - works for both strings and numbers
+        if (condition === "=") {
+          return itemStr === filterStr;
+        }
+        
+        // Not match - works for both strings and numbers  
+        if (condition === "<>") return itemStr !== filterStr;
+        
+        // Regular expression - works for strings
+        if (condition === "~") {
+          try {
+            return new RegExp(filterStr, 'i').test(itemStr);
+          } catch (e) {
+            return false;
+          }
+        }
+        
+        // Check if both values are dates (ISO format detection)
+        const itemDate = new Date(item);
+        const filterDate = new Date(filter);
+        const isItemDate = !isNaN(itemDate.getTime()) && (itemStr.includes('T') || itemStr.includes('-'));
+        const isFilterDate = !isNaN(filterDate.getTime()) && (filterStr.includes('T') || filterStr.includes('-'));
+        
+        if (isItemDate && isFilterDate) {
+          // Date comparison
+          const itemTime = itemDate.getTime();
+          const filterTime = filterDate.getTime();
+          
+          if (condition === "<") return itemTime < filterTime;
+          if (condition === "<=") return itemTime <= filterTime;
+          if (condition === ">") return itemTime > filterTime;
+          if (condition === ">=") return itemTime >= filterTime;
+        } else {
+          // Try numeric comparison first
+          const itemNum = parseFloat(item);
+          const filterNum = parseFloat(filter);
+          
+          if (!isNaN(itemNum) && !isNaN(filterNum)) {
+            // Numeric comparison
+            if (condition === "<") return itemNum < filterNum;
+            if (condition === "<=") return itemNum <= filterNum;
+            if (condition === ">") return itemNum > filterNum;
+            if (condition === ">=") return itemNum >= filterNum;
+          } else {
+            // String comparison (alphabetical)
+            if (condition === "<") return itemStr.localeCompare(filterStr) < 0;
+            if (condition === "<=") return itemStr.localeCompare(filterStr) <= 0;
+            if (condition === ">") return itemStr.localeCompare(filterStr) > 0;
+            if (condition === ">=") return itemStr.localeCompare(filterStr) >= 0;
+          }
+        }
+
+        // Default: Partial match (case-insensitive)
+        return itemStr.toUpperCase().includes(filterStr.toUpperCase());
       });
-    } else {
-      // Just alphabetical sort when not allowing sort by selection
-      return filteredItems.sort((a, b) => a.localeCompare(b));
-    }
-  },
+
+      // Sort by selection status only when allowSorting is true (panel open/apply)
+      if (this.allowSorting) {
+        return filteredItems.sort((a, b) => {
+          const aSelected = this.selectedItems.includes(a);
+          const bSelected = this.selectedItems.includes(b);
+          
+          // Selected items first, then unselected
+          if (aSelected && !bSelected) return -1;
+          if (!aSelected && bSelected) return 1;
+          
+          // Within same selection status, sort alphabetically
+          return a.localeCompare(b);
+        });
+      } else {
+        // Just alphabetical sort when not allowing sort by selection
+        return filteredItems.sort((a, b) => a.localeCompare(b));
+      }
+    },
 
 
     symbol() {
@@ -761,6 +805,9 @@ div.panel-title span, button.panel-button span {
 }
 
 .select-all-item {
+  top: 0;
+  position: sticky;
+  z-index: 10;
   background-color: #f8f9fa;
   border-bottom: 2px solid #dee2e6 !important;
 }
