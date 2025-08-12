@@ -65,6 +65,22 @@ export default {
             return new Date(text + ' GMT+0').getTime()
           case 'datetimesectick':
             return new Date(text + ' GMT+0').getTime()
+          case 'timestamptz':
+            // Handle PostgreSQL timestamptz format: 2025-06-13 16:49:22.597 +0530
+            // Convert to ISO format for Date parsing
+            if (text && typeof text === 'string') {
+              // Parse the timezone offset
+              const tzMatch = text.match(/([+-]\d{4})$/)
+              if (tzMatch) {
+                const tzOffset = tzMatch[1]
+                const baseDateStr = text.replace(/\s*[+-]\d{4}$/, '')
+                // Convert timezone offset to ISO format (+0530 -> +05:30)
+                const isoTz = tzOffset.slice(0, 3) + ':' + tzOffset.slice(3)
+                const isoString = baseDateStr.replace(' ', 'T') + isoTz
+                return new Date(isoString).getTime()
+              }
+            }
+            return new Date(text).getTime()
           case 'check10':
           case 'checkYN':
           case 'checkTF':
@@ -108,6 +124,28 @@ export default {
             d = new Date(val * 1 ? val * 1 : val).getTime()
             if (!d) return ''
             return new Date(d - offset).toISOString().replace('T', ' ').slice(0, 19)
+          case 'timestamptz':
+            d = new Date(val * 1 ? val * 1 : val).getTime()
+            if (!d) return ''
+            const date = new Date(d)
+            
+            // Format: YYYY-MM-DD HH:mm:ss.SSS +ZZZZ
+            const year = date.getFullYear()
+            const month = String(date.getMonth() + 1).padStart(2, '0')
+            const day = String(date.getDate()).padStart(2, '0')
+            const hours = String(date.getHours()).padStart(2, '0')
+            const minutes = String(date.getMinutes()).padStart(2, '0')
+            const seconds = String(date.getSeconds()).padStart(2, '0')
+            const milliseconds = String(date.getMilliseconds()).padStart(3, '0')
+            
+            // Get timezone offset in +HHMM format
+            const timezoneOffset = -date.getTimezoneOffset()
+            const offsetSign = timezoneOffset >= 0 ? '+' : '-'
+            const offsetHours = String(Math.floor(Math.abs(timezoneOffset) / 60)).padStart(2, '0')
+            const offsetMinutes = String(Math.abs(timezoneOffset) % 60).padStart(2, '0')
+            const timezone = offsetSign + offsetHours + offsetMinutes
+            
+            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds} ${timezone}`
           case 'map':
             if (this.options.constructor.name.endsWith('Function'))
               return this.options(val)[val]
@@ -191,6 +229,11 @@ export default {
           break
         case 'datetimesectick':
           allowKeys = allowKeys || ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', ' ', ':']
+          break
+        case 'timestamptz':
+          // Allow characters needed for timestamptz format: digits, dashes, spaces, colons, dots, plus/minus
+          allowKeys = allowKeys || ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', ' ', ':', '.', '+']
+          lengthLimit = lengthLimit || 29 // Max length for "YYYY-MM-DD HH:mm:ss.SSS +ZZZZ"
           break
         case 'check10':
           style.textAlign = 'center'

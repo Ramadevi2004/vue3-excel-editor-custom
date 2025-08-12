@@ -39,6 +39,7 @@
                   <svg v-else aria-hidden="true" focusable="false" data-prefix="fas" data-icon="bars" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" class="svg-inline--fa fa-bars fa-w-14 fa-sm"><path fill="currentColor" d="M16 132h416c8.837 0 16-7.163 16-16V76c0-8.837-7.163-16-16-16H16C7.163 60 0 67.163 0 76v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16z"></path></svg>
                 </span>
               </th>
+              
               <th v-for="(item, p) in fields"
                   v-show="!item.invisible"
                   :key="`th-${p}`"
@@ -1258,15 +1259,37 @@ export default defineComponent({
       const instance = getCurrentInstance()
       instance?.proxy?.$forceUpdate()
     },
-    renderColumnCellStyle (field, record) {
-      let result = field.initStyle
-      if (typeof result === 'function') result = result(record, field)
-      if (field.readonly) result = Object.assign(result, this.readonlyStyle)
-      if (field.left) result.left = field.left
-      if (record && field.color)
-        result.color = (typeof field.color === 'function' ? field.color(record) : field.color)
-      return result
+    renderColumnCellStyle(field, record) {
+      // Always produce a plain object
+      let base = {};
+
+      // If the initial style is a function, call it, else use as is
+      let init = field.initStyle;
+      if (typeof init === 'function') init = init(record, field);
+
+      // If init is an array, merge them into one object
+      if (Array.isArray(init)) {
+        // Merge all into 'base'
+        init.forEach(obj => {
+          if (obj && typeof obj === 'object') Object.assign(base, obj);
+        });
+      } else if (typeof init === 'object' && init !== null) {
+        Object.assign(base, init);
+      }
+      // If readonly, add those styles too
+      if (field.readonly) Object.assign(base, this.readonlyStyle);
+
+      // Set left position if exists
+      if (field.left) base.left = field.left;
+
+      // Set color if exists
+      if (record && field.color) {
+        base.color = (typeof field.color === 'function' ? field.color(record) : field.color);
+      }
+
+      return base;
     },
+
     localeDate (d) {
       if (typeof d === 'undefined') d = new Date()
       const pad = n => n < 10 ? '0'+n : n;
@@ -1287,6 +1310,24 @@ export default defineComponent({
         const currentDateTimeSec = this.localeDate()
         const currentDateTime = currentDateTimeSec.slice(0, 19)
         const currentDate = currentDateTimeSec.slice(0, 10)
+        const currentTimestamptz = (() => {
+          const date = new Date()
+          const year = date.getFullYear()
+          const month = String(date.getMonth() + 1).padStart(2, '0')
+          const day = String(date.getDate()).padStart(2, '0')
+          const hours = String(date.getHours()).padStart(2, '0')
+          const minutes = String(date.getMinutes()).padStart(2, '0')
+          const seconds = String(date.getSeconds()).padStart(2, '0')
+          const milliseconds = String(date.getMilliseconds()).padStart(3, '0')
+          
+          const timezoneOffset = -date.getTimezoneOffset()
+          const offsetSign = timezoneOffset >= 0 ? '+' : '-'
+          const offsetHours = String(Math.floor(Math.abs(timezoneOffset) / 60)).padStart(2, '0')
+          const offsetMinutes = String(Math.abs(timezoneOffset) % 60).padStart(2, '0')
+          const timezone = offsetSign + offsetHours + offsetMinutes
+          
+          return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds} ${timezone}`
+        })()
         switch(field.summary) {
           case 'sum':
             result = this.table.reduce((a, b) => (a + Number(b[i] ? b[i] : 0)), 0)
@@ -1329,6 +1370,11 @@ export default defineComponent({
               case 'datetimetick':
               case 'datetimesectick':
                 result = this.table.reduce((a, b) => (a + (b[i] >= currentTick ? 1 : 0)), 0)
+                this.summary[i] = result
+                return
+              case 'timestamptz':
+                // For timestamptz, compare string values directly since they're in a sortable format
+                result = this.table.reduce((a, b) => (a + (b[i] && b[i] >= currentTimestamptz ? 1 : 0)), 0)
                 this.summary[i] = result
                 return
               default:
@@ -1463,6 +1509,27 @@ export default defineComponent({
         case 'datetimetick':
         case 'datetimesectick':
           this.inputBox.value = new Date(new Date(this.inputDateTime) - offset).getTime()
+          break
+        case 'timestamptz':
+          const date = new Date(this.inputDateTime)
+          
+          // Format: YYYY-MM-DD HH:mm:ss.SSS +ZZZZ
+          const year = date.getFullYear()
+          const month = String(date.getMonth() + 1).padStart(2, '0')
+          const day = String(date.getDate()).padStart(2, '0')
+          const hours = String(date.getHours()).padStart(2, '0')
+          const minutes = String(date.getMinutes()).padStart(2, '0')
+          const seconds = String(date.getSeconds()).padStart(2, '0')
+          const milliseconds = String(date.getMilliseconds()).padStart(3, '0')
+          
+          // Get timezone offset in +HHMM format
+          const timezoneOffset = -date.getTimezoneOffset()
+          const offsetSign = timezoneOffset >= 0 ? '+' : '-'
+          const offsetHours = String(Math.floor(Math.abs(timezoneOffset) / 60)).padStart(2, '0')
+          const offsetMinutes = String(Math.abs(timezoneOffset) % 60).padStart(2, '0')
+          const timezone = offsetSign + offsetHours + offsetMinutes
+          
+          this.inputBox.value = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds} ${timezone}`
           break
       }
       this.inputBoxShow = 0
@@ -1887,7 +1954,7 @@ export default defineComponent({
 
     /* *** Column Separator *******************************************************************************************
      */
-    colSepMouseDown (e) {
+     colSepMouseDown (e) {
       e.preventDefault()
       e.stopPropagation()
       if (this.allowAddCol && !e.target.classList.contains('col-sep')) {
@@ -1896,30 +1963,40 @@ export default defineComponent({
         const pos = Array.from(me.parentElement.children).findIndex(td => td === me)
         this.insertColumn(pos)
       }
+
       this.focused = false
+
       const getStyleVal = (elm, css) => {
-        window.getComputedStyle(elm, null).getPropertyValue(css)
+        if (!elm) return '';
+        return window.getComputedStyle(elm, null).getPropertyValue(css)
       }
-      const index = Array.from(this.labelTr.children).indexOf(e.target.parentElement)
-      this.sep = {}
-      // this.sep.curCol = this.colgroupTr.children[Array.from(this.labelTr.children).indexOf(e.target.parentElement)]
-      this.sep.curCol = this.colgroupTr.children[index - (this.noNumCol ? 1: 0)]
-      this.sep.curField = this.fields[index - 1]
-      // this.sep.nxtCol = this.sep.curCol.nextElementSibling
+
+      const index = Array.from(this.labelTr.children).indexOf(e.target.parentElement);
+      if (index < 0) {
+        console.warn('parent element not found in labelTr for event target');
+        return;
+      }
+      this.sep = {};
+      this.sep.curCol = this.colgroupTr.children[index - (this.noNumCol ? 1: 0)];
+      if (!this.sep.curCol) {
+        console.warn('curCol is undefined at index', index);
+        return;
+      }
+      this.sep.curField = this.fields[index - 1];
       this.sep.pageX = e.pageX
       let padding = 0
       if (getStyleVal(this.sep.curCol, 'box-sizing') !== 'border-box') {
-        const padLeft = getStyleVal(this.sep.curCol, 'padding-left')
-        const padRight = getStyleVal(this.sep.curCol, 'padding-right')
+        const padLeft = getStyleVal(this.sep.curCol, 'padding-left');
+        const padRight = getStyleVal(this.sep.curCol, 'padding-right');
         if (padLeft && padRight)
           padding = parseInt(padLeft) + parseInt(padRight)
       }
       this.sep.curColWidth = e.target.parentElement.offsetWidth - padding
-      // if (this.sep.nxtCol)
-      //   this.sep.nxtColWidth = this.sep.nxtCol.offsetWidth - padding
+
       window.addEventListener('mousemove', this.colSepMouseMove)
       window.addEventListener('mouseup', this.colSepMouseUp)
     },
+
     colSepMouseOver (e) {
       if (e.target.classList.contains('col-sep')) {
         e.target.style.borderRight = '5px solid #cccccc'
@@ -2037,7 +2114,9 @@ export default defineComponent({
     completeHeaderChange (e) {
       const th = e.target.parentElement.parentElement
       const index = Array.from(th.parentElement.children).findIndex(v => v === th)
-      this.fields[index - 1].label = e.target.textContent
+      const newText = e.target.textContent.trim()
+      this.fields[index - 1].label = newText
+      this.fields[index - 1].name = newText
     },
     isSticky(pos){
       const colPos = typeof pos === 'undefined' ? this.columnFilterRef.colPos : pos
