@@ -2850,9 +2850,13 @@ export default defineComponent({
       // console.log(fieldName);
       const cell = e.target;
       let cellText = cell.innerHTML;
-      if (fieldName === "Data Dictionary Product Name") {
+      
+      // Find the field by name and check if it's multiselect type
+      const field = this.fields.find(f => f.label === fieldName || f.name === fieldName);
+      if (field && field.type === 'multiselect') {
         cellText = cellText.split(",").map(item => item.trim()).join("<br>"); // Splitting by comma and adding line breaks
       }
+      
       this.textTip = cellText; // Store formatted text in tooltip
       const rect = cell.getBoundingClientRect();
       this.$refs.texttip.style.top = (rect.top - 14) + "px";
@@ -3013,10 +3017,12 @@ export default defineComponent({
     updateTextTip(event) {
       const cell = this.inputBox;
       this.textTip = this.inputBox.value  ; // Update tooltip text dynamically
-      const fieldName = this.currentField.label
-      if (fieldName === "Data Dictionary Product Name") {
+      
+      // Check if current field is multiselect type and format accordingly
+      if (this.currentField && this.currentField.type === 'multiselect') {
         this.textTip = this.textTip.split(",").map(item => item.trim()).join("<br>"); // Splitting by comma and adding line breaks
       }
+      
       // Get position of the input field
       const rect = cell.getBoundingClientRect();
       this.$refs.texttip.style.top = `${rect.top - 14}px`;
@@ -3428,8 +3434,7 @@ export default defineComponent({
               if (this.currentField.type === 'multiselect') {
                 // console.log("list",list);
                 const delimiter = this.currentField.delimiter || ',';
-                const selectedValues = (this.inputBox.value || '').split(delimiter).map(v => v.trim());
-                // console.log(selectedValues);
+                const selectedValues = (this.inputBox.value || '').split(delimiter).map(v => v.trim()).filter(v => v.length > 0);
                 this.selectedItemsForAutocomplete = selectedValues;
                 // console.log("intiasing selectedItemsForAutocomplete")
                 list.sort((a, b) => {
