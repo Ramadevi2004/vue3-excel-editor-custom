@@ -2970,6 +2970,8 @@ export default defineComponent({
         this.autocompleteInputs = []
         this.autocompleteSelect = -1
       }
+      // Reset multiselect state when moving between cells
+      this.selectedItemsForAutocomplete = []
       if (this.recalAutoCompleteList) clearTimeout(this.recalAutoCompleteList)
 
       // set the label markers
@@ -3434,8 +3436,15 @@ export default defineComponent({
               if (this.currentField.type === 'multiselect') {
                 // console.log("list",list);
                 const delimiter = this.currentField.delimiter || ',';
-                const selectedValues = (this.inputBox.value || '').split(delimiter).map(v => v.trim()).filter(v => v.length > 0);
-                this.selectedItemsForAutocomplete = selectedValues;
+                
+                // Use the cell's original value to get previously selected items, not the search input
+                const cellOriginalValue = this.currentCell ? this.currentCell.textContent : '';
+                const selectedValues = (cellOriginalValue || '').split(delimiter).map(v => v.trim()).filter(v => v.length > 0);
+                
+                // Only initialize if not already set (to preserve selections during search)
+                if (!this.selectedItemsForAutocomplete || force) {
+                  this.selectedItemsForAutocomplete = selectedValues;
+                }
                 // console.log("intiasing selectedItemsForAutocomplete")
                 list.sort((a, b) => {
                   const isASelected = this.selectedItemsForAutocomplete.includes(a);
@@ -3536,12 +3545,9 @@ export default defineComponent({
 
         const delimiter = this.currentField.delimiter || ',';
 
-        // Get the current value and split it into array of selected items
-        let currentValue = this.inputBox.value || '';
-        let selectedItems = currentValue
-          .split(delimiter)
-          .map(item => item.trim())
-          .filter(item => item.length > 0);
+        // Use the stored selected items from autocomplete initialization, not current input value
+        // This prevents treating search terms as selected items
+        let selectedItems = [...(this.selectedItemsForAutocomplete || [])];
 
         // Check if the item is already selected
         const existingIndex = selectedItems.findIndex(item =>
@@ -3557,6 +3563,9 @@ export default defineComponent({
 
         // Update the input value with the new selection
         this.inputBox.value = selectedItems.join(delimiter + ' ');
+        
+        // Update the stored selected items
+        this.selectedItemsForAutocomplete = selectedItems;
 
         // Keep the input box focused
         this.inputBoxChanged = true;
